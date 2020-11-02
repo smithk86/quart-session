@@ -60,6 +60,10 @@ class MemcachedSession(ServerSideSession):
     pass
 
 
+class MotorSession(ServerSideSession):
+    pass
+
+
 class NullSession(ServerSideSession):
     pass
 
@@ -120,14 +124,17 @@ class SessionInterface(QuartSessionInterface):
             options['sid'] = self._generate_sid()
             return self.session_class(**options)
 
-        try:
-            data = self.serializer.loads(val)
-        except:
-            app.logger.warning(f"Failed to deserialize session "
-                               f"data for sid: {sid}. Generating new sid.")
-            app.logger.debug(f"data: {val}")
-            options['sid'] = self._generate_sid()
-            return self.session_class(**options)
+        if self.serializer is None:
+            data = val
+        else:
+            try:
+                data = self.serializer.loads(val)
+            except:
+                app.logger.warning(f"Failed to deserialize session "
+                                   f"data for sid: {sid}. Generating new sid.")
+                app.logger.debug(f"data: {val}")
+                options['sid'] = self._generate_sid()
+                return self.session_class(**options)
 
         protection = self._config['SESSION_PROTECTION']
         if protection is True and addr is not None and \
@@ -168,7 +175,11 @@ class SessionInterface(QuartSessionInterface):
         secure = self.get_cookie_secure(app)
         expires = self.get_expiration_time(app, session)
 
-        val = self.serializer.dumps(dict(session))
+        if self.serializer is None:
+            val = dict(session)
+        else:
+            val = self.serializer.dumps(dict(session))
+
         await self.set(key=session_key, value=val, app=app)
         if self.use_signer:
             session_id = self._get_signer(app).sign(want_bytes(session.sid))
@@ -351,6 +362,36 @@ class MemcachedSessionInterface(SessionInterface):
     async def delete(self, key: str, app: Quart = None):
         key = key.encode()
         return await self.backend.delete(key)
+
+
+class MotorSessionInterface(SessionInterface):
+    serializer = None
+    session_class = MotorSession
+
+    def __init__(self, motor_database, collection_name, **kwargs):
+        super().__init__(**kwargs)
+        self.motor_database = motor_database
+        self.collection_name = collection_name
+
+    async def create(self, app: Quart) -> None:
+        pass
+
+    async def get(self, key: str, app: Quart = None) -> None:
+        return await self.collection.find_one({'_id': key}, {'_id': False})
+
+    async def set(self, key: str, value, expiry: int = None,
+                  app: Quart = None) -> None:
+        await self.collection.update_one({
+                '_id': key
+            }, {
+                '$set': value
+            },
+            upsert=True
+        )
+
+    @property
+    def collection(self):
+        return self.motor_database.get_collection(self.collection_name)
 
 
 class NullSessionInterface(SessionInterface):

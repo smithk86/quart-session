@@ -16,7 +16,7 @@ import os
 
 from quart import Quart
 
-from .sessions import RedisSessionInterface, RedisTrioSessionInterface, MemcachedSessionInterface, NullSessionInterface
+from .sessions import RedisSessionInterface, RedisTrioSessionInterface, MemcachedSessionInterface, MotorSessionInterface, NullSessionInterface
 
 
 class Session(object):
@@ -129,6 +129,14 @@ class Session(object):
         elif config['SESSION_TYPE'] == 'memcached':
             session_interface = MemcachedSessionInterface(
                 memcached=config['SESSION_MEMCACHED'],
+                key_prefix=config['SESSION_KEY_PREFIX'],
+                use_signer=config['SESSION_USE_SIGNER'],
+                permanent=config['SESSION_PERMANENT'],
+                **config)
+        elif config['SESSION_TYPE'] == 'motor':
+            session_interface = MotorSessionInterface(
+                motor_database=config['SESSION_MOTOR_DATABASE'],
+                collection_name=config['SESSION_MOTOR_COLLECTION_NAME'],
                 key_prefix=config['SESSION_KEY_PREFIX'],
                 use_signer=config['SESSION_USE_SIGNER'],
                 permanent=config['SESSION_PERMANENT'],
