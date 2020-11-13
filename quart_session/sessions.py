@@ -11,8 +11,9 @@
 """
 import time
 from typing import Optional
-from uuid import uuid4
+from uuid import UUID, uuid4
 import asyncio
+import functools
 
 from quart import Quart, current_app
 from quart.wrappers import BaseRequestWebsocket, Response
@@ -364,6 +365,21 @@ class MemcachedSessionInterface(SessionInterface):
         return await self.backend.delete(key)
 
 
+def convert_key_to_uuid(func):
+    @functools.wraps(func)
+    async def wrapper(*args, **kwargs):
+        if 'key' in kwargs:
+            key = kwargs['key']
+            try:
+                if key.startswith('session:'):
+                    _, _uuid = tuple(key.split(':'))
+                    kwargs['key'] = UUID(_uuid)
+            except Exception as e:
+                pass
+        return await func(*args, **kwargs)
+    return wrapper
+
+
 class MotorSessionInterface(SessionInterface):
     serializer = None
     session_class = MotorSession
@@ -376,10 +392,12 @@ class MotorSessionInterface(SessionInterface):
     async def create(self, app: Quart) -> None:
         pass
 
-    async def get(self, key: str, app: Quart = None) -> None:
+    @convert_key_to_uuid
+    async def get(self, key: UUID, app: Quart = None) -> None:
         return await self.collection.find_one({'_id': key}, {'_id': False})
 
-    async def set(self, key: str, value, expiry: int = None,
+    @convert_key_to_uuid
+    async def set(self, key: UUID, value, expiry: int = None,
                   app: Quart = None) -> None:
         await self.collection.update_one({
                 '_id': key
