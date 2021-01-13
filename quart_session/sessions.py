@@ -384,21 +384,30 @@ class MotorSessionInterface(SessionInterface):
     serializer = None
     session_class = MotorSession
 
-    def __init__(self, motor_database, collection_name, **kwargs):
+    def __init__(self, motor_database, collection_name, data_encoder=None, data_decoder=None, **kwargs):
         super().__init__(**kwargs)
         self.motor_database = motor_database
         self.collection_name = collection_name
+        self.data_encoder = data_encoder
+        self.data_decoder = data_decoder
 
     async def create(self, app: Quart) -> None:
         pass
 
     @convert_key_to_uuid
     async def get(self, key: UUID, app: Quart = None) -> None:
-        return await self.collection.find_one({'_id': key}, {'_id': False})
+        value = await self.collection.find_one({'_id': key}, {'_id': False})
+        if callable(self.data_decoder):
+            value = self.data_decoder(value)
+        return value
 
     @convert_key_to_uuid
     async def set(self, key: UUID, value, expiry: int = None,
                   app: Quart = None) -> None:
+
+        if callable(self.data_encoder):
+            value = self.data_encoder(value)
+
         await self.collection.update_one({
                 '_id': key
             }, {

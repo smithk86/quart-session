@@ -140,6 +140,8 @@ class Session(object):
                 key_prefix=config['SESSION_KEY_PREFIX'],
                 use_signer=config['SESSION_USE_SIGNER'],
                 permanent=config['SESSION_PERMANENT'],
+                data_encoder=config['SESSION_DATA_ENCODER'],
+                data_decoder=config['SESSION_DATA_DECODER'],
                 **config)
         elif config['SESSION_TYPE'] == 'null':
             app.logger.warning(f"{backend_warning}. Currently using: null")
