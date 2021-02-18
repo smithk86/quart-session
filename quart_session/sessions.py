@@ -14,7 +14,9 @@ from typing import Optional
 from uuid import UUID, uuid4
 import asyncio
 import functools
+from datetime import datetime
 
+from pytz import utc
 from quart import Quart, current_app
 from quart.wrappers import BaseRequestWebsocket, Response
 from quart.wrappers.response import FileBody
@@ -407,6 +409,8 @@ class MotorSessionInterface(SessionInterface):
 
         if callable(self.data_encoder):
             value = self.data_encoder(value)
+
+        value['_last_update'] = utc.localize(datetime.utcnow())
 
         await self.collection.update_one({
                 '_id': key
